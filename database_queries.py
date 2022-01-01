@@ -61,6 +61,7 @@ def insert_gumtree(data):
     generic_insert(query, ordered_data)
 
 
+
 def generic_query_gumtree(kms, price):
     headers = ["title", "price", "location", "variant", "kilometres", "transmission", "drive_train", "fuel_type", "main_description", "date_listed", "last_edited", "seller_type", "colour", "air_conditioning", "registered", "registration_number", "first_photo", "year", "make", "model", "body_type", "url", "search_name"]
     formatted_fields = ",".join(headers)
@@ -85,11 +86,23 @@ def generic_query_gumtree(kms, price):
     return headers, new_rows
 
 
+def make_all_not_still_on():
+    query = """ UPDATE gumtree
+                SET still_on = 0"""
+    generic_query(query, ())
+
+
+def set_still_on_for_car(car_url):
+    query = """ UPDATE gumtree SET still_on=1 WHERE url = ? """
+    generic_query(query, (car_url,))
+
+
 def check_if_inserted(car_url):
     query = """ SELECT * FROM gumtree where url = ?"""
     rows = generic_query(query, (car_url,))
     # print(len(rows))
     if len(rows) > 0:
+        set_still_on_for_car(car_url)
         return True
     return False
 

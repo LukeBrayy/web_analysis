@@ -2,28 +2,18 @@ import os
 import json
 import requests
 from bs4 import BeautifulSoup
-# from selenium import webdriver
-# from selenium.webdriver.chrome.options import Options
-# from webdriver_manager.chrome import ChromeDriverManager
+
 import database_queries
 from datetime import datetime, date, timedelta
 import random
 import time
 
 
-def make_selenium():
-    chrome_options = Options()
-    chrome_options.add_argument("--disable-extensions")
-    chrome_options.add_argument("--disable-gpu")
-    chrome_options.add_argument("--no-sandbox") # linux only
-    chrome_options.add_argument("--headless")
-    chrome_options.add_argument("--log-level=3")
-    driver = webdriver.Chrome(ChromeDriverManager().install(), options=chrome_options)
-    return driver
 
 
 
 def carsales_results_scraper(driver):
+    #doesn't work, needs selenium library too which I removed
     url = 'https://www.carsales.com.au/cars/?&q=(And.Service.Carsales._.Condition.Used._.(C.Make.Toyota._.(Or.Model.Landcruiser._.Model.Landcruiser%20Prado.)))'
 
     driver.get(url)
@@ -33,7 +23,7 @@ def carsales_results_scraper(driver):
 
 
 
-def gumtree_car_scraper(car_url, driver):
+def gumtree_car_scraper(car_url):
     car_dict = {}
 
     url = "https://www.gumtree.com.au" + car_url
@@ -61,6 +51,7 @@ def gumtree_car_scraper(car_url, driver):
     header_lookup = {"date listed": "date_listed", "last edited":"last_edited", "seller type":"seller_type", "drive train":"drive_train", "fuel type":"fuel_type", "air conditioning":"air_conditioning", "registration number":"registration_number", "body type":"body_type"}
     for attr in all_attributes:
         try:
+            # if True:
             header = attr.find("span", class_="vip-ad-attributes__value").text[:-1]
             #print(header)
             try:
@@ -94,7 +85,7 @@ def gumtree_car_scraper(car_url, driver):
                 car_dict[formatted_header] = value
                 #print(header, value)
         except AttributeError:
-            print("attribute error")
+           pass # random items will be missing depending on what info the ad has
 
 
     #driver.get(url)
@@ -127,9 +118,8 @@ def gumtree_results_scraper(url):
 
 
 
-def loop_gumtree(driver):
+def loop_gumtree():
     #url = "https://www.gumtree.com.au/s-cars-vans-utes/perth/carmake-toyota/carmodel-toyota_landcruiser/c18320l3008303"
-    base_url = 'https://www.gumtree.com.au/s-cars-vans-utes/perth/carmake-toyota/carmodel-toyota_landcruiser/page-{}/c18320l3008303'
 
     searches = {
         "navara":"https://www.gumtree.com.au/s-cars-vans-utes/perth/carmake-nissan/carmodel-nissan_navara/drivetrain-4x4/page-{}/c18320l3008303?price=__30000.00",
@@ -151,7 +141,8 @@ def loop_gumtree(driver):
         "mux": "https://www.gumtree.com.au/s-cars-vans-utes/wa/carmake-isuzu/carmodel-isuzu_mux/drivetrain-4x4/page-{}/c18320l3008845",
         "wrangler": "https://www.gumtree.com.au/s-cars-vans-utes/wa/carmake-jeep/carmodel-jeep_wrangler/drivetrain-4x4/page-{}/c18320l3008845",
         "challenger": "https://www.gumtree.com.au/s-cars-vans-utes/wa/carmake-mitsubishi/carmodel-mitsubishi_challenger/drivetrain-4x4/page-{}/c18320l3008845",
-        "defender": "https://www.gumtree.com.au/s-cars-vans-utes/wa/carmake-landrover/carmodel-landrover_defender/drivetrain-4x4/page-{}/c18320l3008845"
+        "defender": "https://www.gumtree.com.au/s-cars-vans-utes/wa/carmake-landrover/carmodel-landrover_defender/drivetrain-4x4/page-{}/c18320l3008845",
+        "fortuner": "https://www.gumtree.com.au/s-cars-vans-utes/wa/carmake-toyota/carmodel-toyota_fortuner/page-{}/c18320l3008845"
     }
 
     for search_name in searches:
@@ -165,17 +156,21 @@ def loop_gumtree(driver):
                 if not database_queries.check_if_inserted("https://www.gumtree.com.au" + car_url):
                     print("Trying", car_url)
                     try:
-                        car_dict = gumtree_car_scraper(car_url, driver)
+                        # if True:
+                        car_dict = gumtree_car_scraper(car_url)
+                        car_dict["search_name"] = search_name
+                        database_queries.insert_gumtree(car_dict)
+                        database_queries.set_still_on_for_car("https://www.gumtree.com.au" + car_url)
+                        print("Completed url", car_url)
+
                     except Exception as E:
-                        with open("broken_links.txt", "a") as file:
-                            file.write(car_url + ", " + str(E) + "\n")
-                    car_dict["search_name"] = search_name
-                    database_queries.insert_gumtree(car_dict)
-                    print("Completed url", car_url)
+                       with open("broken_links.txt", "a") as file:
+                           file.write(car_url + ", " + str(E) + "\n")
 
 
 
-def test_gumtree_car(driver):
+
+def test_gumtree_car():
     car_url = '/s-ad/waikiki/cars-vans-utes/2007-volkswagen-mk5-golf-gti/1258933907'
     car_dict = gumtree_car_scraper(car_url, driver)
     database_queries.insert_gumtree(car_dict)
@@ -184,6 +179,6 @@ def test_gumtree_car(driver):
 
 
 if __name__ == '__main__':
-    driver = False
-    loop_gumtree(driver)
+    database_queries.make_all_not_still_on()
+    loop_gumtree()
     database_queries.export_csv()
